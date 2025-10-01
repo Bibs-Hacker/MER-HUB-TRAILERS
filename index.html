@@ -1,0 +1,579 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MER-HUB — Movie UI</title>
+  <style>
+    /* === Reset & base === */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body,#app{height:100%}
+    body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:#0b0b0f;color:#e9e6ff}/* === Splash + pre-login overlay === */
+.preauth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#0b0210 0%,#180018 100%);z-index:99999}
+.auth-card{width:360px;max-width:92%;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));padding:20px;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.auth-card h2{color:#ffd6f0;margin-bottom:8px}
+.auth-card label{display:block;font-size:13px;color:#ffd6f080;margin:8px 0 4px}
+.auth-card input{width:100%;padding:10px;border-radius:8px;border:0;background:rgba(255,255,255,.03);color:#fff}
+.auth-actions{display:flex;gap:8px;margin-top:12px}
+.btn{padding:10px 12px;border-radius:10px;border:0;cursor:pointer}
+.btn.primary{background:linear-gradient(90deg,#ff4fb6,#ff2fa8);color:#fff;font-weight:700}
+.link{background:transparent;border:0;color:#ffd6f0;text-decoration:underline;cursor:pointer}
+
+/* === Splash (after login) === */
+.splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#ff6fb3 0%,#ff2fa8 50%,#a11b7b 100%);z-index:9999;transition:opacity 8.5s ease}
+.splash.hidden{opacity:0;pointer-events:none}
+.merhub-logo{font-weight:900;font-size:72px;letter-spacing:2px;color:#fff;text-shadow:0 6px 30px rgba(255,95,156,.6);display:flex;align-items:center}
+/* make the split-M face forward (like Netflix N) */
+.merhub-logo .m-split{display:inline-block;position:relative;width:84px;height:84px;margin-right:12px;transform:skewX(-10deg)}
+.m-split .slice{position:absolute;inset:0;background:linear-gradient(180deg,#fff,#ffd6ea);clip-path:polygon(0 0,40% 0,50% 50%,40% 100%,0 100%);}
+.m-split .slice.right{left:0;transform-origin:center;clip-path:polygon(60% 0,100% 0,100% 100%,60% 100%,50% 50%);}
+.m-split .slice.right{transform:rotateY(12deg)}
+.m-split .glow{position:absolute;inset:0;filter:blur(8px);opacity:.25}
+
+.loader-sub{margin-top:12px;color:#fff8;display:flex;align-items:center;gap:8px}
+
+/* === App layout === */
+.app-wrap{position:relative;min-height:100%;display:flex;flex-direction:column}
+header{height:120px;display:flex;align-items:flex-end;padding:16px 28px;gap:18px}
+.bg-blur{position:fixed;inset:0;background-image:url('https://files.catbox.moe/b2xl1t.jpg');background-size:cover;background-position:center;filter:blur(8px) brightness(.28);transform:scale(1.06);z-index:-2}
+.bg-overlay{position:fixed;inset:0;background:linear-gradient(180deg,rgba(10,6,12,.4),rgba(4,3,6,.7));z-index:-1}
+
+.profile-rotate{width:100px;height:100px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,.06);box-shadow:0 10px 30px rgba(255,20,120,.12);animation:spin 12s linear infinite}
+@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+nav.quick-access{display:flex;align-items:center;gap:12px;padding:10px 8px;background:linear-gradient(90deg,rgba(255,255,255,.03),rgba(255,255,255,.01));backdrop-filter:blur(6px);border-radius:14px;overflow:auto}
+nav.quick-access button{background:transparent;border:none;color:#ffd6f0;padding:10px 14px;border-radius:10px;font-weight:600;white-space:nowrap;cursor:pointer}
+nav.quick-access button.active{box-shadow:0 8px 30px rgba(255,0,135,.12);transform:translateY(-4px)}
+
+main{padding:16px 22px 120px;overflow:auto}
+.row{margin:18px 0}
+.row h3{font-size:18px;margin-bottom:8px;color:#ffd6f0}
+.cards{display:flex;gap:12px;overflow:auto;padding-bottom:8px}
+.card{min-width:160px;height:240px;border-radius:10px;background:#111;padding:6px;position:relative;flex:0 0 auto;cursor:pointer;transition:transform .25s ease,box-shadow .25s ease}
+.card img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+.card:hover{transform:translateY(-8px);box-shadow:0 18px 40px rgba(255,73,154,.12)}
+.card .title{position:absolute;left:6px;right:6px;bottom:8px;font-weight:700;font-size:13px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.8));padding:6px;border-radius:6px;color:#fff}
+
+/* neon glow */
+.glow{box-shadow:0 0 18px rgba(255,120,190,.12),0 12px 40px rgba(255,40,150,.06)}
+
+/* Modal trailer */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:999}
+.modal.open{display:flex}
+.modal .player{width:90%;max-width:900px;background:#071018;border-radius:12px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal .player iframe{width:100%;height:520px;border:0}
+.modal .meta{padding:12px;color:#ddd}
+
+/* Admin hidden button */
+.admin-btn{position:fixed;left:8px;top:8px;padding:8px;border-radius:8px;background:transparent;border:0;color:#ffb6d6;opacity:.06;cursor:pointer}
+.admin-btn.show{opacity:1}
+
+/* Search & controls */
+.controls{display:flex;gap:12px;align-items:center;margin-left:auto}
+.search{position:relative}
+.search input{padding:10px 12px;border-radius:10px;border:0;background:rgba(255,255,255,.04);color:#fff;min-width:200px}
+.toggle{padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,#200018,#3a002b);cursor:pointer}
+
+footer{position:fixed;left:0;right:0;bottom:0;padding:10px 18px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.6));text-align:center;font-size:24px;color:#ffb6d6}
+
+/* responsive tweaks */
+@media (max-width:800px){.merhub-logo{font-size:40px}.profile-rotate{width:56px;height:56px}.cards{gap:8px}.card{min-width:130px;height:200px}.auth-card{width:92%}}
+
+  </style>
+</head>
+<body>
+  <div class="bg-blur"></div>
+  <div class="bg-overlay"></div>  <!-- Admin quick access (hidden by default) --><button id="adminBtn" class="admin-btn" title="Admin">🔒</button>
+
+  <!-- Pre-auth (login / signup) overlay -->  <div id="preAuth" class="preauth">
+    <div class="auth-card" id="authCard">
+      <h2>Welcome to MER-HUB</h2>
+      <div id="authForms">
+        <!-- Login form -->
+        <div id="loginForm">
+          <label>Email</label>
+          <input id="loginEmail" type="email" placeholder="you@example.com" />
+          <label>Password</label>
+          <input id="loginPassword" type="password" placeholder="Your password" />
+          <div class="auth-actions">
+            <button class="btn primary" id="btnLogin">Login</button>
+            <button class="btn link" id="showSignup">Don't have an account? Sign up</button>
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:#ffd6f080">Tip: This demo uses Firebase (configure below) to persist users across devices.</div>
+        </div><!-- Signup form (hidden initially) -->
+    <div id="signupForm" style="display:none">
+      <label>Full name</label>
+      <input id="signName" type="text" placeholder="Your name" />
+      <label>Email</label>
+      <input id="signEmail" type="email" placeholder="you@example.com" />
+      <label>Password</label>
+      <input id="signPassword" type="password" placeholder="Choose a strong password" />
+      <div class="auth-actions">
+        <button class="btn primary" id="btnSignup">Create account</button>
+        <button class="btn link" id="showLogin">Back to Login</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  </div>  <div class="splash" id="splash">
+    <div style="text-align:center;color:#fff">
+      <div class="merhub-logo">
+        <span class="m-split" aria-hidden>
+          <span class="slice left"></span>
+          <span class="slice right"></span>
+          <span class="glow"></span>
+        </span>
+        <span>MER-HUB</span>
+      </div>
+      <div class="loader-sub">Loading MER-HUB visuals...</div>
+    </div>
+  </div>  <div id="app" class="app-wrap" style="display:none">
+    <header>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="profile-rotate" title="Tech Brian">
+          <img src="https://files.catbox.moe/b2xl1t.jpg" alt="profile" style="width:100%;height:100%;object-fit:cover;border-radius:50%">
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <div id="greeting" style="font-weight:800;font-size:18px;color:#ffd6f0">Hi</div>
+          <div style="font-size:12px;color:#ffd6f080">Enjoy your picks</div>
+        </div>
+      </div><div class="controls">
+    <div class="search">
+      <input id="searchInput" placeholder="Search movies or TV... (type & press Enter)" />
+    </div>
+    <div class="toggle" id="themeToggle">Theme</div>
+  </div>
+</header>
+
+<div style="padding:0 28px 8px;display:flex;gap:10px;align-items:center">
+  <nav class="quick-access" id="quickAccess"></nav>
+</div>
+
+<main id="mainContent"></main>
+
+<h1>
+<footer>© MER-HUB by Tech Brian &amp; Merab 2025</footer>
+</h1>
+
+  </div>  <!-- Trailer modal -->  <div class="modal" id="modal">
+    <div class="player" role="dialog" aria-modal="true">
+      <iframe id="ytFrame" src="" allow="autoplay; encrypted-media" allowfullscreen title="Trailer"></iframe>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>  <!-- Admin panel modal -->  <div class="modal" id="adminModal">
+    <div class="player" style="max-width:900px;padding:12px;border-radius:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>Admin — Registered Users</strong>
+        <button id="closeAdmin">Close</button>
+      </div>
+      <div id="adminContent" style="max-height:520px;overflow:auto;background:#06070a;padding:8px;border-radius:8px;color:#fff"></div>
+    </div>
+  </div>  <script>
+    /* =====================
+       Configuration
+       ===================== */
+    const TMDB_API_KEY = "4f2372847d0483ed10dac1fcad73ef66"; // <- put your TMDb key here
+    const TMDB_BASE = 'https://api.themoviedb.org/3';
+    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+
+    // --- Firebase placeholders ---
+    // To persist registrations across devices, configure Firebase and paste your config below.
+    // If you don't want Firebase, the demo still works using localStorage only (data won't sync across devices).
+    const USE_FIREBASE = false; // set to true after adding firebase config
+    const FIREBASE_CONFIG = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "your-app.firebaseapp.com",
+      projectId: "your-app-id",
+      storageBucket: "your-app.appspot.com",
+      messagingSenderId: "...",
+      appId: "...",
+      measurementId: "..."
+    };
+
+    /* =====================
+       Category Mapping
+       - a mix of TMDb genre ids and language filters for region-specific buckets
+       ===================== */
+    const CATEGORY_MAP = {
+      'Action': {genre: 28},
+      'Adventure': {genre: 12},
+      'Comedy': {genre: 35},
+      'Drama': {genre: 18},
+      'Horror': {genre: 27},
+      'Romance': {genre: 10749},
+      'Sci-Fi': {genre: 878},
+      'Thriller': {genre: 53},
+      'Mystery': {genre: 9648},
+      'Fantasy': {genre: 14},
+      'Crime': {genre: 80},
+      'War': {genre: 10752},
+      'Western': {genre: 37},
+      'Animation': {genre: 16},
+      'Family': {genre: 10751},
+      'Musical': {genre: 10402},
+      'Documentary': {genre: 99},
+      'Nollywood': {with_original_language: 'en', region: 'NG'},
+      'Bollywood': {with_original_language: 'hi'},
+      'K-Drama': {with_original_language: 'ko'},
+      'African Movies': {region: 'AF'},
+      'Spanish Movies': {with_original_language: 'es'},
+      'Chinese Movies': {with_original_language: 'zh'},
+      'French Cinema': {with_original_language: 'fr'},
+      'Soaps / Telenovelas': {with_keywords: 'telenovela,soap'},
+      'Series / TV Shows': {discoverType: 'tv'},
+      'Classic Films': {primary_release_date_lte: '1980-12-31'},
+      'Teen / High School': {with_keywords: 'teen,high school'},
+      'Christmas Specials': {with_keywords: 'christmas,holiday'},
+      'Crime Investigations': {with_keywords: 'investigation,detective'},
+      'Vampire / Werewolf': {with_keywords: 'vampire,werewolf'},
+      'Stand-Up Comedy': {with_keywords: 'stand-up,comedy'},
+      'True Crime': {with_keywords: 'true crime'},
+      'Epic / Historical Fantasy': {with_keywords: 'epic,historical,fantasy'}
+    };
+
+    /* =====================
+       State
+       ===================== */
+    const genrePage = {}; // track pages per category key
+    const genreLoading = {}; // prevent duplicate loads
+
+    /* =====================
+       Helpers
+       ===================== */
+    const preAuth = document.getElementById('preAuth');
+    const splash = document.getElementById('splash');
+    const app = document.getElementById('app');
+    const main = document.getElementById('mainContent');
+    const quick = document.getElementById('quickAccess');
+    const modal = document.getElementById('modal');
+    const ytFrame = document.getElementById('ytFrame');
+    const meta = document.getElementById('meta');
+    const adminBtn = document.getElementById('adminBtn');
+    const adminModal = document.getElementById('adminModal');
+    const adminContent = document.getElementById('adminContent');
+
+    function showError(msg){console.warn(msg);alert(msg)}
+
+    /* =====================
+       Simple Firebase init (if requested)
+       ===================== */
+    let firebaseApp=null, firestore=null;
+    async function initFirebase(){
+      if(!USE_FIREBASE) return;
+      try{
+        // load firebase scripts dynamically
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+        firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+        firestore = firebase.firestore();
+        console.log('Firebase init');
+      }catch(e){console.error('Firebase failed',e)}
+    }
+
+    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
+    /* =====================
+       TMDb wrapper
+       ===================== */
+    async function tmdb(path, params={}){
+      if(!TMDB_API_KEY || TMDB_API_KEY.includes('REPLACE')){
+        throw new Error('Missing TMDb API key. Put it in TMDB_API_KEY at the top of the file.');
+      }
+      const url = new URL(TMDB_BASE + path);
+      url.searchParams.set('api_key', TMDB_API_KEY);
+      Object.keys(params).forEach(k => {
+        if(params[k] !== undefined && params[k] !== null) url.searchParams.set(k, params[k]);
+      });
+      const res = await fetch(url.href);
+      if(!res.ok) throw new Error('TMDb error');
+      return res.json();
+    }
+
+    async function getVideos(movieId, type='movie'){
+      try{
+        const res = await tmdb('/' + type + '/' + movieId + '/videos');
+        return res.results || [];
+      }catch(e){return []}
+    }
+
+    /* =====================
+       Build UI + Infinite Scroll per row
+       ===================== */
+    function makeCard(item){
+      const d = document.createElement('div');
+      d.className='card glow';
+      const img = document.createElement('img');
+      img.src = item.poster_path ? IMG_BASE + item.poster_path : '';
+      img.alt = item.title || item.name;
+      d.appendChild(img);
+      const t = document.createElement('div');
+      t.className='title';
+      t.textContent = item.title || item.name || 'Untitled';
+      d.appendChild(t);
+
+      d.addEventListener('click', async ()=>{
+        const vids = await getVideos(item.id, item.media_type || 'movie');
+        const yt = (vids || []).find(function(v){return v.site === 'YouTube' && (v.type || '').toLowerCase().indexOf('trailer') !== -1}) || (vids || [])[0];
+        if(yt){
+          ytFrame.src = 'https://www.youtube.com/embed/' + yt.key + '?autoplay=1&rel=0';
+          meta.textContent = (item.title || item.name) + ' • ' + (item.release_date || item.first_air_date || '') + ' • Rating: ' + (item.vote_average || 'N/A');
+          modal.classList.add('open');
+          document.body.style.overflow='hidden';
+        } else {showError('Trailer not found for this title.');}
+      });
+
+      return d;
+    }
+
+    function makeRow(title, key){
+      const r = document.createElement('section'); r.className='row'; r.id = 'cat-' + key.split(' ').join('-');
+      const h = document.createElement('h3'); h.textContent = title;
+      r.appendChild(h);
+      const c = document.createElement('div'); c.className='cards'; c.dataset.key = key;
+      r.appendChild(c);
+
+      // infinite scroll on this row
+      c.addEventListener('scroll', async ()=>{
+        const scrollLeft = c.scrollLeft;
+        const max = c.scrollWidth - c.clientWidth;
+        if(max - scrollLeft < 300){ // near end
+          await loadMoreForCategory(key);
+        }
+      });
+
+      return r;
+    }
+
+    async function loadMoreForCategory(catKey){
+      if(genreLoading[catKey]) return;
+      genreLoading[catKey] = true;
+      genrePage[catKey] = (genrePage[catKey] || 1) + 1;
+      try{
+        const items = await fetchCategory(catKey, genrePage[catKey]);
+        const row = document.querySelector('#cat-' + catKey.split(' ').join('-') + ' .cards');
+        if(row && items && items.length){
+          items.forEach(it=>row.appendChild(makeCard(it)));
+        }
+      }catch(e){console.error(e)}
+      genreLoading[catKey] = false;
+    }
+
+    /* Top-level fetch for a category. Supports different query types as per CATEGORY_MAP */
+    async function fetchCategory(catKey, page=1){
+      const map = CATEGORY_MAP[catKey];
+      const params = {page:page, language:'en-US'};
+      if(!map) return [];
+      if(map.genre) params.with_genres = map.genre;
+      if(map.with_original_language) params.with_original_language = map.with_original_language;
+      if(map.primary_release_date_lte) params['primary_release_date.lte'] = map.primary_release_date_lte;
+      if(map.with_keywords) params.with_keywords = map.with_keywords;
+
+      try{
+        if(map.discoverType === 'tv'){
+          const res = await tmdb('/discover/tv', params);
+          return res.results || [];
+        } else {
+          const res = await tmdb('/discover/movie', params);
+          return res.results || [];
+        }
+      }catch(e){console.error('fetchCategory',e);return []}
+    }
+
+    /* =====================
+       Boot / Build initial rows
+       ===================== */
+    async function boot(){
+      try{
+        await initFirebase();
+
+        // build quick access buttons from CATEGORY_MAP keys
+        const cats = Object.keys(CATEGORY_MAP);
+        cats.forEach(function(c, idx){
+          const btn = document.createElement('button'); btn.textContent = c; if(idx===0) btn.classList.add('active');
+          btn.addEventListener('click', function(){
+            const target = document.getElementById('cat-' + c.split(' ').join('-'));
+            if(target) target.scrollIntoView({behavior:'smooth',block:'center'});
+            document.querySelectorAll('.quick-access button').forEach(function(b){b.classList.remove('active')});btn.classList.add('active');
+          });
+          quick.appendChild(btn);
+        });
+
+        // Trending row on top
+        const trending = await tmdb('/trending/all/week',{language:'en-US',page:1});
+        main.appendChild(makeRow('Trending', 'Trending'));
+        const trendingCards = document.querySelector('#cat-Trending .cards');
+        (trending.results || []).slice(0,12).forEach(function(it){trendingCards.appendChild(makeCard(it))});
+
+        // create rows for categories and load first page
+        for(const c of cats){
+          main.appendChild(makeRow(c, c));
+          genrePage[c] = 1;
+          const items = await fetchCategory(c, 1);
+          const cardsEl = document.querySelector('#cat-' + c.split(' ').join('-') + ' .cards');
+          (items || []).slice(0,12).forEach(function(it){cardsEl.appendChild(makeCard(it))});
+        }
+
+        // everything ready — hide splash and show app
+        setTimeout(function(){
+          preAuth.style.display='none';
+          splash.classList.add('hidden');
+          setTimeout(function(){splash.style.display='none'},700);
+          app.style.display='block';
+        }, 800);
+
+      }catch(err){
+        console.error(err);
+        showError('Boot failed — check TMDb key and network.');
+      }
+    }
+
+    /* =====================
+       Modal handling
+       ===================== */
+    modal.addEventListener('click', function(e){
+      if(e.target === modal){
+        modal.classList.remove('open');
+        ytFrame.src='';
+        document.body.style.overflow='';
+      }
+    });
+
+    adminModal.addEventListener('click', function(e){ if(e.target === adminModal){ adminModal.classList.remove('open'); adminContent.innerHTML=''; }});
+
+    document.getElementById('closeAdmin').addEventListener('click', function(){ adminModal.classList.remove('open'); adminContent.innerHTML=''; });
+
+    /* =====================
+       Search
+       ===================== */
+    document.getElementById('searchInput').addEventListener('keydown', async function(e){
+      if(e.key === 'Enter'){
+        const q = e.target.value.trim(); if(!q) return;
+        try{
+          const res = await tmdb('/search/multi',{query:q,language:'en-US',page:1,include_adult:false});
+          main.scrollTo({top:0,behavior:'smooth'});
+          const prev = document.getElementById('cat-Search'); if(prev) prev.remove();
+          main.prepend(makeRow('Search results for "'+q+'"', 'Search'));
+          const cards = document.querySelector('#cat-Search .cards');
+          (res.results || []).slice(0,30).forEach(function(it){cards.appendChild(makeCard(it))});
+        }catch(err){showError('Search failed.');}
+      }
+    });
+
+    /* =====================
+       Authentication (local + optional Firebase)
+       - Signup stores user data in Firestore (if enabled) and always stores locally in localStorage as fallback
+       - Admin button opens a locked panel requiring admin pass to see registered users
+       ===================== */
+    const btnShowSignup = document.getElementById('showSignup');
+    const btnShowLogin = document.getElementById('showLogin');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+
+    btnShowSignup.addEventListener('click', function(){ loginForm.style.display='none'; signupForm.style.display='block'; });
+    btnShowLogin.addEventListener('click', function(){ loginForm.style.display='block'; signupForm.style.display='none'; });
+
+    document.getElementById('btnSignup').addEventListener('click', async function(){
+      const name = document.getElementById('signName').value.trim();
+      const email = document.getElementById('signEmail').value.trim();
+      const pass = document.getElementById('signPassword').value;
+      if(!email || !pass || !name) return showError('Please fill name, email and password.');
+
+      const user = {id: 'u_' + Date.now(), name, email, createdAt: new Date().toISOString()};
+
+      // store locally
+      const users = JSON.parse(localStorage.getItem('merhub_users') || '[]');
+      users.push(user);
+      localStorage.setItem('merhub_users', JSON.stringify(users));
+
+      // try firebase
+      if(USE_FIREBASE && firestore){
+        try{ await firestore.collection('users').doc(user.id).set(user); }catch(e){console.error('fb save',e)}
+      }
+
+      // auto-login
+      localStorage.setItem('merhub_current_user', JSON.stringify(user));
+      document.getElementById('greeting').textContent = 'Hi, ' + user.name;
+      boot();
+    });
+
+    document.getElementById('btnLogin').addEventListener('click', async function(){
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPassword').value;
+      if(!email || !pass) return showError('Please provide email & password.');
+
+      // simple local auth: check localStorage users
+      const users = JSON.parse(localStorage.getItem('merhub_users') || '[]');
+      const found = users.find(function(u){return u.email.toLowerCase() === email.toLowerCase()});
+      if(found){
+        localStorage.setItem('merhub_current_user', JSON.stringify(found));
+        document.getElementById('greeting').textContent = 'Hi, ' + found.name;
+        boot();
+      } else {
+        showError('Account not found locally. If you configured Firebase, ensure USE_FIREBASE=true to enable centralized accounts.');
+      }
+    });
+
+    // admin button behavior: require admin pass to open panel
+    adminBtn.addEventListener('click', function(){
+      const pass = prompt('Enter admin pass to view registered users:');
+      if(!pass) return;
+      // The admin password is stored client-side for demo. Replace with secure server check for production.
+      if(pass === 'MERAB_ADMIN_2025'){
+        openAdminPanel();
+      } else alert('Wrong admin password');
+    });
+
+    async function openAdminPanel(){
+      adminContent.innerHTML = '<em>Loading users...</em>';
+      adminModal.classList.add('open');
+      // load from firebase first
+      if(USE_FIREBASE && firestore){
+        try{
+          const snap = await firestore.collection('users').get();
+          const rows = [];
+          snap.forEach(function(doc){rows.push(doc.data())});
+          renderAdminUsers(rows);
+          return;
+        }catch(e){console.error(e)}
+      }
+      // fallback to localStorage
+      const users = JSON.parse(localStorage.getItem('merhub_users') || '[]');
+      renderAdminUsers(users);
+    }
+
+    function renderAdminUsers(rows){
+      if(!rows || !rows.length) { adminContent.innerHTML = '<div>No users registered yet.</div>'; return; }
+      adminContent.innerHTML = '';
+      rows.forEach(function(u){
+        const el = document.createElement('div');
+        el.style.padding='8px'; el.style.borderBottom='1px solid #111';
+        el.innerHTML = '<strong>' + (u.name || '') + '</strong> <div style="font-size:12px;color:#ddd">' + (u.email || '') + ' • ' + (u.createdAt || '') + ' • id:' + (u.id || '') + '</div>';
+        adminContent.appendChild(el);
+      });
+    }
+
+    /* Auto-show adminBtn only if a hidden keystroke is pressed (for security) */
+    (function(){
+      let seq = '';
+      window.addEventListener('keydown', function(e){
+        seq += e.key;
+        if(seq.indexOf('openadmin') !== -1){ adminBtn.classList.add('show'); seq = ''; }
+        if(seq.length > 20) seq = seq.slice(-20);
+      });
+    })();
+
+    // modal close for trailer
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ if(modal.classList.contains('open')){ modal.classList.remove('open'); ytFrame.src=''; document.body.style.overflow=''; } if(adminModal.classList.contains('open')){ adminModal.classList.remove('open'); } } });
+
+    // If there's a current user stored already, set greeting and start boot directly
+    const existing = JSON.parse(localStorage.getItem('merhub_current_user') || 'null');
+    if(existing){ document.getElementById('greeting').textContent = 'Hi, ' + existing.name; preAuth.style.display='none'; setTimeout(function(){ splash.classList.add('hidden'); app.style.display='block'; boot(); }, 600); }
+
+    // Click anywhere on splash to dismiss (after logged in) — animation feel
+    splash.addEventListener('click', function(){ if(preAuth.style.display === 'none'){ splash.classList.add('hidden'); setTimeout(function(){splash.style.display='none'},700); } });
+
+  </script></body>
+</html>
